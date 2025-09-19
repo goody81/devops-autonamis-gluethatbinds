@@ -1,0 +1,224 @@
+# BMAD Protocol Helm Chart Values
+# Build-Manage-Autonomously-Deploy configuration
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/bmad-protocol/bmad
+  tag: "main"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# BMAD Agents Configuration
+agents:
+  planner:
+    enabled: true
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+    env:
+      OPENAI_API_KEY: ""
+      OPA_ENDPOINT: "http://opa:8181"
+  
+  executor:
+    enabled: true
+    replicas: 3
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+    firecracker:
+      enabled: true
+      cpu: 500m
+      memory: 512Mi
+      kernelImage: ghcr.io/bmad-protocol/kernel:5.10-bmad
+  
+  verifier:
+    enabled: true
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# Open Policy Agent Configuration
+opa:
+  enabled: true
+  replicas: 2
+  policies:
+    - cost.rego
+    - security.rego
+    - executor.rego
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Telemetry Stack
+telemetry:
+  prometheus:
+    enabled: true
+    retention: 30d
+    storageClass: ""
+    storageSize: 50Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+  
+  grafana:
+    enabled: true
+    adminPassword: changeme
+    dashboards:
+      enabled: true
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  victoriametrics:
+    enabled: true
+    retention: 90d
+    storageSize: 100Gi
+
+# ToolForge MCP Registry
+toolforge:
+  enabled: true
+  registry:
+    url: "https://raw.githubusercontent.com/bmad-protocol/bmad/main/toolforge/registry.yaml"
+  mcpServers:
+    aws:
+      enabled: false
+      credentials: ""
+    kubernetes:
+      enabled: true
+      inCluster: true
+    terraform:
+      enabled: false
+      backend: ""
+    github:
+      enabled: false
+      token: ""
+
+# Security Configuration
+security:
+  cosign:
+    enabled: true
+    publicKey: |
+      -----BEGIN PUBLIC KEY-----
+      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEv+3v2J4...
+      -----END PUBLIC KEY-----
+  
+  spiffe:
+    enabled: true
+    trustDomain: bmad.local
+    certTTL: 15m
+  
+  ebpf:
+    enabled: true
+    policy: strict
+    syscallAllowlist:
+      - read
+      - write
+      - open
+      - close
+      - mmap
+
+# Service Configuration
+service:
+  type: ClusterIP
+  port: 80
+  grpcPort: 50051
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: bmad.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Resource Management
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+# Node Selection
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# RBAC
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+rbac:
+  create: true
+
+# Pod Security
+podAnnotations: {}
+podSecurityContext:
+  fsGroup: 65534
+  runAsNonRoot: true
+  runAsUser: 65534
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534
+
+# Quickstart Demo
+quickstart:
+  enabled: false
+  examples:
+    - 00-hello-bmad
+    - 01-cost-optimized

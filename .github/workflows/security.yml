@@ -1,0 +1,58 @@
+name: Security & Compliance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  cosign-verify:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Verify signature
+        run: cosign verify --key cosign.pub ghcr.io/bmad-protocol/bmad:latest
+
+  slsa-provenance:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate SLSA provenance
+        uses: slsa-framework/slsa-github-generator@v2
+        with:
+          artifact-path: ghcr.io/bmad-protocol/bmad
+
+  compliance-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CIS Kubernetes Benchmark
+        run: |
+          echo "Running CIS compliance checks..."
+          # Add actual CIS benchmark tools here
+      - name: SOC 2 Evidence Collection
+        run: |
+          echo "Collecting SOC 2 evidence..."
+          # Add SOC 2 compliance tooling here

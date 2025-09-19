@@ -1,0 +1,67 @@
+# Multi-stage BMAD Agent Build
+# Produces distroless, minimal container for BMAD components
+
+# Build stage
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build binaries
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o planner ./agents/planner
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o executor ./agents/executor
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o verifier ./agents/verifier
+
+# Python dependencies stage
+FROM python:3.11-slim AS python-deps
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY agents/planner/requirements.txt ./
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Final distroless stage
+FROM gcr.io/distroless/base-debian12:nonroot
+
+LABEL org.opencontainers.image.title="BMAD Protocol"
+LABEL org.opencontainers.image.description="Build-Manage-Autonomously-Deploy - AI-native DevOps automation"
+LABEL org.opencontainers.image.vendor="BMAD Protocol"
+LABEL org.opencontainers.image.source="https://github.com/bmad-protocol/bmad"
+
+# Copy CA certificates
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Copy built binaries
+COPY --from=builder /app/planner /usr/local/bin/
+COPY --from=builder /app/executor /usr/local/bin/
+COPY --from=builder /app/verifier /usr/local/bin/
+
+# Copy Python runtime and dependencies
+COPY --from=python-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=python-deps /root/.local /home/nonroot/.local
+
+# Copy configuration files
+COPY --chown=nonroot:nonroot toolforge/ /etc/bmad/toolforge/
+COPY --chown=nonroot:nonroot policies/ /etc/bmad/policies/
+
+# Set up user and permissions
+USER nonroot:nonroot
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["/usr/local/bin/planner", "health"]
+
+EXPOSE 50051 8080 9090
+
+# Default to planner service
+CMD ["/usr/local/bin/planner"]

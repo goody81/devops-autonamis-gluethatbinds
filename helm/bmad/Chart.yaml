@@ -1,0 +1,20 @@
+apiVersion: v2
+name: bmad
+description: BMAD Protocol - Build-Manage-Autonomously-Deploy
+type: application
+version: 0.1.0
+appVersion: "main"
+home: https://github.com/bmad-protocol/bmad
+sources:
+  - https://github.com/bmad-protocol/bmad
+maintainers:
+  - name: BMAD Team
+    email: maintainers@bmad-protocol.io
+keywords:
+  - devops
+  - ai
+  - automation
+  - kubernetes
+  - mcp
+annotations:
+  category: DevOps

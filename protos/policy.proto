@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package bmad.policy.v1;
+
+option go_package = "github.com/bmad-protocol/bmad/pkg/pb/policy/v1";
+
+// Policy evaluation service for OPA/Rego integration
+service PolicyService {
+  // Evaluate checks if a DAG complies with policies
+  rpc Evaluate(EvaluateRequest) returns (EvaluateResponse);
+  
+  // ValidatePolicy checks policy syntax and logic
+  rpc ValidatePolicy(ValidatePolicyRequest) returns (ValidatePolicyResponse);
+  
+  // ListPolicies returns available policies
+  rpc ListPolicies(ListPoliciesRequest) returns (ListPoliciesResponse);
+}
+
+message EvaluateRequest {
+  string policy_name = 1;
+  string input_json = 2;  // DAG or execution context as JSON
+  map<string, string> data = 3;
+}
+
+message EvaluateResponse {
+  bool allowed = 1;
+  repeated PolicyDecision decisions = 2;
+  string reason = 3;
+  map<string, string> metadata = 4;
+}
+
+message PolicyDecision {
+  string rule = 1;
+  bool result = 2;
+  string expression = 3;
+  string explanation = 4;
+}
+
+message ValidatePolicyRequest {
+  string policy_content = 1;
+  string policy_name = 2;
+}
+
+message ValidatePolicyResponse {
+  bool valid = 1;
+  repeated string errors = 2;
+  repeated string warnings = 3;
+}
+
+message ListPoliciesRequest {
+  string category = 1;  // "security", "cost", "executor"
+}
+
+message ListPoliciesResponse {
+  repeated PolicyInfo policies = 1;
+}
+
+message PolicyInfo {
+  string name = 1;
+  string category = 2;
+  string description = 3;
+  string version = 4;
+  bool enabled = 5;
+  repeated string tags = 6;
+}
