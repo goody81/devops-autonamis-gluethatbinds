@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package bmad.v1;
+
+option go_package = "github.com/bmad-protocol/bmad/pkg/pb/v1";
+
+// BMAD core service for orchestrating AI-native DevOps operations
+service BMAD {
+  // Plan converts natural language intent to executable DAG
+  rpc Plan(PlanRequest) returns (PlanResponse);
+  
+  // Execute runs the planned DAG with firecracker isolation
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+  
+  // Verify ensures execution correctness and compliance
+  rpc Verify(VerifyRequest) returns (VerifyResponse);
+  
+  // Watch provides real-time execution status
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+  
+  // Replay reconstructs execution from Merkle-rooted logs
+  rpc Replay(ReplayRequest) returns (ReplayResponse);
+  
+  // Audit generates compliance evidence
+  rpc Audit(AuditRequest) returns (AuditResponse);
+}
+
+// Natural language intent input
+message Intent {
+  string text = 1;
+  map<string, string> context = 2;
+  repeated string constraints = 3;
+  string cost_limit = 4;
+}
+
+// Directed Acyclic Graph representation
+message DAG {
+  repeated Node nodes = 1;
+  repeated Edge edges = 2;
+  string checksum = 3;
+  int64 created_at = 4;
+}
+
+message Node {
+  string id = 1;
+  string type = 2;  // "mcp_call", "validation", "checkpoint"
+  map<string, string> parameters = 3;
+  repeated string dependencies = 4;
+  string mcp_server = 5;
+  string tool = 6;
+}
+
+message Edge {
+  string from = 1;
+  string to = 2;
+  string condition = 3;
+}
+
+// Planning service messages
+message PlanRequest {
+  Intent intent = 1;
+  string session_id = 2;
+}
+
+message PlanResponse {
+  DAG dag = 1;
+  repeated string warnings = 2;
+  string estimated_cost = 3;
+  int64 estimated_duration = 4;
+}
+
+// Execution service messages
+message ExecuteRequest {
+  DAG dag = 1;
+  string session_id = 2;
+  bool dry_run = 3;
+}
+
+message ExecuteResponse {
+  string execution_id = 1;
+  ExecutionStatus status = 2;
+  repeated NodeResult results = 3;
+}
+
+message NodeResult {
+  string node_id = 1;
+  ExecutionStatus status = 2;
+  string output = 3;
+  string error = 4;
+  int64 duration_ms = 5;
+  string firecracker_vm_id = 6;
+}
+
+// Verification service messages
+message VerifyRequest {
+  string execution_id = 1;
+  repeated string policies = 2;
+}
+
+message VerifyResponse {
+  bool passed = 1;
+  repeated PolicyViolation violations = 2;
+  string smt_proof = 3;
+}
+
+message PolicyViolation {
+  string policy = 1;
+  string violation = 2;
+  string severity = 3;
+  string node_id = 4;
+}
+
+// Watch service messages
+message WatchRequest {
+  string execution_id = 1;
+}
+
+message WatchResponse {
+  string execution_id = 1;
+  ExecutionStatus status = 2;
+  NodeResult current_node = 3;
+  int32 progress_percentage = 4;
+}
+
+// Replay service messages
+message ReplayRequest {
+  string execution_id = 1;
+  string from_node = 2;
+  string to_node = 3;
+  bool include_snapshots = 4;
+}
+
+message ReplayResponse {
+  repeated NodeResult results = 1;
+  string merkle_root = 2;
+  bool integrity_verified = 3;
+}
+
+// Audit service messages
+message AuditRequest {
+  string standard = 1;  // "soc2", "cis", "gdpr"
+  string from_tag = 2;
+  string to_tag = 3;
+}
+
+message AuditResponse {
+  string report_id = 1;
+  string compliance_score = 2;
+  repeated ComplianceEvidence evidence = 3;
+  string report_url = 4;
+}
+
+message ComplianceEvidence {
+  string control = 1;
+  string status = 2;  // "pass", "fail", "not_applicable"
+  string evidence_url = 3;
+  string description = 4;
+}
+
+enum ExecutionStatus {
+  EXECUTION_STATUS_UNSPECIFIED = 0;
+  EXECUTION_STATUS_PENDING = 1;
+  EXECUTION_STATUS_RUNNING = 2;
+  EXECUTION_STATUS_SUCCEEDED = 3;
+  EXECUTION_STATUS_FAILED = 4;
+  EXECUTION_STATUS_CANCELLED = 5;
+}

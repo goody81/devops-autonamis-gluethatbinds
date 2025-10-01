@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-bmad
+  labels:
+    app: hello-bmad
+    bmad.io/example: "00-hello-bmad"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hello-bmad
+  template:
+    metadata:
+      labels:
+        app: hello-bmad
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: config
+        configMap:
+          name: hello-bmad-content
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-bmad
+  labels:
+    app: hello-bmad
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080
+  selector:
+    app: hello-bmad
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hello-bmad-content
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>BMAD Protocol Demo</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .logo { text-align: center; font-size: 3em; margin-bottom: 20px; }
+            .subtitle { text-align: center; color: #666; margin-bottom: 40px; }
+            .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+            .feature { padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007acc; }
+            .status { text-align: center; margin-top: 40px; padding: 20px; background: #d4edda; border-radius: 8px; color: #155724; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="logo">🏗️ BMAD Protocol</div>
+            <div class="subtitle">Build-Manage-Autonomously-Deploy</div>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>🤖 AI-Native</h3>
+                    <p>Natural language intent to executable DAG</p>
+                </div>
+                <div class="feature">
+                    <h3>🔒 Secure</h3>
+                    <p>Firecracker isolation + eBPF sandbox</p>
+                </div>
+                <div class="feature">
+                    <h3>📊 Observable</h3>
+                    <p>Prometheus + Grafana telemetry</p>
+                </div>
+                <div class="feature">
+                    <h3>🛡️ Compliant</h3>
+                    <p>SOC-2 + CIS evidence generation</p>
+                </div>
+            </div>
+            
+            <div class="status">
+                ✅ Hello BMAD deployment successful!<br>
+                Your AI-native DevOps automation is ready.
+            </div>
+        </div>
+    </body>
+    </html>

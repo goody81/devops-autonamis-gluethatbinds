@@ -1,0 +1,115 @@
+# BMAD Protocol Prometheus Recording Rules
+# Optimized metrics aggregation for BMAD observability
+
+groups:
+  - name: bmad.rules
+    interval: 30s
+    rules:
+      # DAG Execution Metrics
+      - record: bmad:dag_execution_duration_seconds
+        expr: histogram_quantile(0.95, sum(rate(bmad_dag_execution_duration_seconds_bucket[5m])) by (le, intent_type))
+        labels:
+          quantile: "0.95"
+      
+      - record: bmad:dag_execution_duration_seconds
+        expr: histogram_quantile(0.99, sum(rate(bmad_dag_execution_duration_seconds_bucket[5m])) by (le, intent_type))
+        labels:
+          quantile: "0.99"
+      
+      - record: bmad:dag_success_rate
+        expr: sum(rate(bmad_dag_executions_total{status="success"}[5m])) / sum(rate(bmad_dag_executions_total[5m]))
+        labels:
+          aggregation: "cluster"
+      
+      - record: bmad:dag_failure_rate
+        expr: sum(rate(bmad_dag_executions_total{status="failed"}[5m])) / sum(rate(bmad_dag_executions_total[5m]))
+        labels:
+          aggregation: "cluster"
+
+      # Node Execution Metrics  
+      - record: bmad:node_execution_duration_seconds
+        expr: histogram_quantile(0.95, sum(rate(bmad_node_execution_duration_seconds_bucket[5m])) by (le, node_type, mcp_server))
+        labels:
+          quantile: "0.95"
+      
+      - record: bmad:node_success_rate_by_mcp
+        expr: sum(rate(bmad_node_executions_total{status="success"}[5m])) by (mcp_server) / sum(rate(bmad_node_executions_total[5m])) by (mcp_server)
+      
+      # Cost Metrics
+      - record: bmad:cost_per_execution_dollars
+        expr: sum(bmad_execution_cost_dollars) by (intent_type) / sum(bmad_dag_executions_total) by (intent_type)
+      
+      - record: bmad:daily_cost_dollars
+        expr: sum(increase(bmad_execution_cost_dollars[24h]))
+        labels:
+          period: "daily"
+      
+      - record: bmad:monthly_cost_dollars
+        expr: sum(increase(bmad_execution_cost_dollars[30d]))
+        labels:
+          period: "monthly"
+
+      # Firecracker VM Metrics
+      - record: bmad:firecracker_vm_utilization
+        expr: sum(bmad_firecracker_vms_active) / sum(bmad_firecracker_vms_total)
+      
+      - record: bmad:firecracker_vm_creation_duration_seconds
+        expr: histogram_quantile(0.95, sum(rate(bmad_firecracker_vm_creation_duration_seconds_bucket[5m])) by (le))
+        labels:
+          quantile: "0.95"
+
+      # Security Metrics
+      - record: bmad:policy_violations_rate
+        expr: sum(rate(bmad_policy_violations_total[5m])) by (policy_type)
+      
+      - record: bmad:security_scan_failures_rate
+        expr: sum(rate(bmad_security_scans_total{status="failed"}[5m])) / sum(rate(bmad_security_scans_total[5m]))
+
+      # Agent Health Metrics
+      - record: bmad:agent_availability
+        expr: up{job=~"bmad-(planner|executor|verifier)"}
+      
+      - record: bmad:agent_request_duration_seconds
+        expr: histogram_quantile(0.95, sum(rate(bmad_agent_request_duration_seconds_bucket[5m])) by (le, agent, method))
+        labels:
+          quantile: "0.95"
+
+      # Resource Utilization
+      - record: bmad:cpu_utilization_percent
+        expr: 100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance))
+      
+      - record: bmad:memory_utilization_percent
+        expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+
+  - name: bmad.alerts.rules
+    interval: 30s
+    rules:
+      # SLO Breach Detection
+      - record: bmad:slo_error_budget_remaining
+        expr: 1 - (bmad:dag_failure_rate / 0.01)  # 99% SLO
+        labels:
+          slo: "availability"
+      
+      - record: bmad:slo_latency_budget_remaining
+        expr: 1 - (bmad:dag_execution_duration_seconds{quantile="0.95"} / 300)  # 5min SLO
+        labels:
+          slo: "latency"
+
+  - name: bmad.capacity.rules
+    interval: 60s
+    rules:
+      # Capacity Planning
+      - record: bmad:hourly_execution_rate
+        expr: sum(rate(bmad_dag_executions_total[1h]) * 3600)
+        labels:
+          period: "hourly"
+      
+      - record: bmad:peak_concurrent_executions
+        expr: max_over_time(sum(bmad_dag_executions_active)[1h:1m])
+        labels:
+          period: "hourly"
+      
+      - record: bmad:resource_demand_prediction
+        expr: predict_linear(bmad:hourly_execution_rate[6h], 3600)
+        labels:
+          forecast_horizon: "1h"
